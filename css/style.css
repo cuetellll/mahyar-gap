@@ -109,7 +109,9 @@ html, body {
 
 button, input, select, textarea { font: inherit; }
 :focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
-[hidden], .hidden { display: none !important; }
+/* Only the attribute is forced. The `.hidden` utility is owned by Tailwind, so
+   responsive combinations such as `hidden md:flex` keep working on desktop. */
+[hidden] { display: none !important; }
 kbd { font-family: 'JetBrains Mono', monospace; }
 
 /* Scrollbars */

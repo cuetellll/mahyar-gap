@@ -29,3 +29,7 @@ desktop.ini
 # Coverage / temp
 coverage/
 tmp/
+
+# local verification artifacts
+.preview/
+verify-*.png

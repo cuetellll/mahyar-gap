@@ -57,9 +57,10 @@ class MahyarGapApp {
       mobileDrawerOpen: false,
       avatarDraft: null,
       viewMode: 'server', // 'server' | 'dms'
-      activeServerId: 'srv_main',
-      activeChannelId: 'chn_general',
-      activeDmConversationId: 'dm_alex_elena',
+      // No hardcoded ids: on a fresh deployment the database holds no servers yet.
+      activeServerId: null,
+      activeChannelId: null,
+      activeDmConversationId: null,
       dmSubView: 'friends', // 'friends' | 'conversation'
       friendsFilter: 'online', // 'online' | 'all' | 'pending' | 'blocked' | 'add'
 
@@ -370,6 +371,16 @@ class MahyarGapApp {
       if (srvChannels.length > 0 && !srvChannels.some((c) => c.id === this.state.activeChannelId)) {
         this.state.activeChannelId = srvChannels[0].id;
       }
+
+      // A brand-new account belongs to no server: land on Direct Messages instead of an empty shell.
+      if (myServers.length === 0) {
+        this.state.activeServerId = null;
+        this.state.activeChannelId = null;
+        if (this.state.viewMode === 'server') {
+          this.state.viewMode = 'dms';
+          this.state.dmSubView = 'friends';
+        }
+      }
     } catch (err) {
       console.error('Failed loading tables:', err);
       this.showToast('Database synchronization warning: ' + err.message, 'error');
@@ -476,7 +487,10 @@ class MahyarGapApp {
   }
 
   getActiveServer() {
-    return this.state.servers.find((s) => s.id === this.state.activeServerId) || this.state.servers[0];
+    const current = this.state.servers.find((s) => s.id === this.state.activeServerId);
+    if (current) return current;
+    // Never surface a server the user is not a member of.
+    return this.getMyServers()[0] || null;
   }
 
   getActiveChannel() {
@@ -725,7 +739,19 @@ class MahyarGapApp {
 
     // Server mode left sidebar
     const srv = this.getActiveServer();
-    if (!srv) return;
+    if (!srv) {
+      headerEl.innerHTML = `<span class="px-1 text-sm font-bold text-primary-token">No servers yet</span>`;
+      bodyEl.innerHTML = `
+        <div class="p-3 space-y-3">
+          <p class="text-xs text-muted-token leading-relaxed">You are not in any server yet. Create your own space or join one with an invite code.</p>
+          <button data-action="openModal" data-action-args="${this.encodeActionArgs(['createJoinServer'])}" class="w-full bg-input hover:bg-white/10 text-sm font-semibold text-primary-token px-3 py-2 rounded-lg transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-plus"></i> Create or join a server
+          </button>
+          <button data-action="switchToDMs" class="w-full text-xs text-muted-token hover:text-primary-token transition">Open Direct Messages</button>
+        </div>
+      `;
+      return;
+    }
 
     const canManageServer = this.hasPermission('MANAGE_SERVER', srv.id);
     const canManageChannels = this.hasPermission('MANAGE_CHANNELS', srv.id);
@@ -1003,7 +1029,26 @@ class MahyarGapApp {
     // 3. Server Channel view
     const ch = this.getActiveChannel();
     if (!ch) {
-      stage.innerHTML = `<div class="flex-1 flex items-center justify-center text-muted-token">Select a channel to start communicating.</div>`;
+      const hasServers = this.getMyServers().length > 0;
+      stage.innerHTML = callBanner + `
+        <div class="flex-1 h-full flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <div class="w-16 h-16 rounded-2xl grid place-items-center text-2xl font-extrabold text-white" style="background-image: linear-gradient(135deg, #7C5CFF, #22D3EE)">MG</div>
+          <div class="space-y-1">
+            <h2 class="text-xl font-bold text-primary-token">${hasServers ? 'Pick a channel' : 'Welcome to Mahyar Gap'}</h2>
+            <p class="text-sm text-muted-token max-w-sm">${hasServers
+              ? 'Select a channel from the sidebar to start communicating, or create a new one.'
+              : 'You are not in any server yet. Create one for your team, or open Direct Messages and start a conversation.'}</p>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+            <button data-action="openModal" data-action-args="${this.encodeActionArgs(['createJoinServer'])}" class="auth-primary px-5 py-2.5">
+              <i class="fa-solid fa-plus mr-1.5"></i> Create or join a server
+            </button>
+            <button data-action="switchToDMs" class="auth-secondary px-5 py-2.5">
+              <i class="fa-solid fa-comments mr-1.5"></i> Open Direct Messages
+            </button>
+          </div>
+        </div>
+      `;
       return;
     }
 
