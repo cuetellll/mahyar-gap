@@ -51,9 +51,31 @@ Open `http://localhost:3000`. `npm run build` produces `css/tailwind.generated.c
 
 Secrets never reach browser JavaScript. LiveKit tokens are minted server-side per room.
 
+## Push to GitHub
+
+The repository stays small on purpose: `node_modules`, `dist/` and `.env` are ignored, so a fresh clone is roughly 1 MB of source and you never upload installed packages. Everything that is generated is rebuilt on the server:
+
+```bash
+npm ci                 # install dependencies (also what Docker and CI run)
+npx prisma generate    # Prisma client
+npm run build          # Tailwind CSS, bundled LiveKit browser client, tsc
+```
+
+`.github/workflows/ci.yml` runs those checks on every push, and `.dockerignore` keeps the Docker build context small so Railway does not upload `node_modules` either.
+
+1. Create an empty repository on GitHub (no README, no .gitignore — both already exist here).
+2. Connect and push:
+
+   ```bash
+   git remote add origin https://github.com/<user>/<repo>.git
+   git push -u origin main
+   ```
+
+Never commit `.env`; only `.env.example` is tracked.
+
 ## Deploy to Railway
 
-1. Push this repository to GitHub, then create a Railway project from the repo. Railway uses the checked-in `Dockerfile` and `railway.json`.
+1. Push this repository to GitHub, then create a Railway project from the repo. Railway uses the checked-in `Dockerfile` and `railway.json`, and builds the image on its own servers (`npm ci` → `prisma generate` → `npm run build`), so no build output is uploaded from your machine.
 2. Add a PostgreSQL service and confirm the web service receives `DATABASE_URL`.
 3. Add the LiveKit variables from your LiveKit project, set `NODE_ENV=production`, and set a fresh `JWT_ACCESS_SECRET`.
 4. Deploy. The container runs `prisma migrate deploy` then starts the server on `$PORT`.
