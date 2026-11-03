@@ -714,8 +714,12 @@ io.on('connection', (socket) => {
 
 // Serve only known static assets; an unknown API route must never fall through to index.html.
 const rootDir = path.resolve(process.cwd());
-app.use('/css', express.static(path.join(rootDir, 'css'), { fallthrough: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
-app.use('/js', express.static(path.join(rootDir, 'js'), { fallthrough: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
+// Asset URLs are not content-hashed, so they must revalidate on every load: a long max-age
+// would keep serving the previous deploy's CSS/JS until the cache expired. ETag +
+// Last-Modified still answer unchanged files with a cheap 304.
+const revalidatingAssets = { fallthrough: false, maxAge: 0, etag: true, lastModified: true } as const;
+app.use('/css', express.static(path.join(rootDir, 'css'), revalidatingAssets));
+app.use('/js', express.static(path.join(rootDir, 'js'), revalidatingAssets));
 app.use('/vendor', express.static(path.join(rootDir, 'public/vendor'), { fallthrough: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
 app.get('/favicon.ico', (_req, res, next) => res.sendFile(path.join(rootDir, 'favicon.ico'), (error) => error && next(error)));
 app.get('/favicon.svg', (_req, res, next) => res.sendFile(path.join(rootDir, 'favicon.svg'), { headers: { 'Content-Type': 'image/svg+xml' } }, (error) => error && next(error)));
